@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Self-Growth Pod — Trending Charts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="blob-field">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div class="blob blob-4"></div>
+    <div class="blob blob-5"></div>
+  </div>
+
+  <header>
+    <h1>🌱 Self-Growth Pod</h1>
+    <nav class="tabs">
+      <a href="index.html">🎧 Podcasts</a>
+      <a href="videos.html">▶️ YouTube</a>
+      <a href="charts.html" class="active">📊 Charts</a>
+    </nav>
+    <p>What's actually trending right now — real Apple Podcasts chart ranks and real YouTube view/subscriber counts.</p>
+    <p id="updated-at" class="updated"></p>
+  </header>
+
+  <h2 class="section-title">🎧 Top Podcasts by Category</h2>
+  <div id="category-pills" class="category-pills"></div>
+  <div id="chart-list" class="chart-list">
+    <p class="loading">Loading charts…</p>
+  </div>
+
+  <h2 class="section-title">🔥 Trending YouTube Videos This Week</h2>
+  <main id="trending-videos" class="grid">
+    <p class="loading">Loading trending videos…</p>
+  </main>
+
+  <h2 class="section-title">⭐ Top Channels We're Tracking</h2>
+  <div id="top-channels" class="chart-list">
+    <p class="loading">Loading top channels…</p>
+  </div>
+
+  <footer>
+    <p>
+      Chart ranks come from Apple Podcasts' public daily charts. YouTube numbers are real view
+      &amp; subscriber counts from the videos this site already tracks. Nobody publishes raw
+      podcast listener counts publicly — rank is the honest signal available for free.
+    </p>
+  </footer>
+
+  <script src="script-charts.js"></script>
+</body>
+</html>
