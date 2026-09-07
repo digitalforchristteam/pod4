@@ -35,7 +35,13 @@ function parseItunesDuration(duration) {
   return parts.reduce((total, val) => total * 60 + val, 0);
 }
 
+// FEED_TIMEOUT_MS caps how long we'll wait on any single podcast's RSS feed
+// before giving up and moving on — without this, one slow/unresponsive feed
+// could stall the entire daily run.
+const FEED_TIMEOUT_MS = 10000;
+
 const parser = new Parser({
+  timeout: FEED_TIMEOUT_MS,
   customFields: {
     item: [
       ['itunes:duration', 'duration'],
@@ -46,13 +52,18 @@ const parser = new Parser({
 
 async function searchPodcasts(term) {
   const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=podcast&limit=${MAX_SHOWS_PER_KEYWORD}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    console.error(`iTunes search failed for "${term}": ${res.status}`);
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(FEED_TIMEOUT_MS) });
+    if (!res.ok) {
+      console.error(`iTunes search failed for "${term}": ${res.status}`);
+      return [];
+    }
+    const data = await res.json();
+    return data.results || [];
+  } catch (err) {
+    console.error(`iTunes search timed out or failed for "${term}": ${err.message}`);
     return [];
   }
-  const data = await res.json();
-  return data.results || [];
 }
 
 async function fetchFeedEpisodes(feedUrl, showName, showArt) {

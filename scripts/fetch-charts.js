@@ -27,6 +27,7 @@ const CATEGORIES = [
 
 const CHARTS_OUTPUT = 'data/charts.json';
 const HISTORY_PATH = 'data/chart-history.json';
+const REQUEST_TIMEOUT_MS = 10000; // prevents one slow category from stalling the run
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
@@ -34,7 +35,10 @@ function todayISO() {
 
 async function fetchCategoryChart(genreId) {
   const url = `https://itunes.apple.com/${COUNTRY}/rss/toppodcasts/limit=${LIMIT}/genre=${genreId}/json`;
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
 

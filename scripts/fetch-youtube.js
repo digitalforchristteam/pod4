@@ -19,6 +19,10 @@ const MAX_RESULTS_PER_KEYWORD = 10;
 const MAX_TOTAL_VIDEOS = 150;
 const OUTPUT_PATH = 'data/videos.json';
 
+// Caps how long we'll wait on any single API request before giving up and
+// moving on — prevents one slow response from stalling the whole daily run.
+const REQUEST_TIMEOUT_MS = 10000;
+
 // --- Quality filters (tune these to taste) ---
 const MIN_VIDEO_DURATION_SECONDS = 90;   // filters out YouTube Shorts / clips
 const MIN_CHANNEL_SUBSCRIBERS = 1000;    // filters out very low-effort/spam channels
@@ -86,24 +90,29 @@ async function searchVideos(keyword) {
   });
 
   const url = `https://www.googleapis.com/youtube/v3/search?${params.toString()}`;
-  const res = await fetch(url);
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
 
-  if (!res.ok) {
-    console.error(`YouTube search failed for "${keyword}": ${res.status} ${await res.text()}`);
+    if (!res.ok) {
+      console.error(`YouTube search failed for "${keyword}": ${res.status} ${await res.text()}`);
+      return [];
+    }
+
+    const data = await res.json();
+    return (data.items || []).map(item => ({
+      videoId: item.id.videoId,
+      title: item.snippet.title,
+      channelTitle: item.snippet.channelTitle,
+      channelId: item.snippet.channelId,
+      publishedAt: item.snippet.publishedAt,
+      description: (item.snippet.description || '').slice(0, 300),
+      thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url || null,
+      liveBroadcastContent: item.snippet.liveBroadcastContent || 'none'
+    }));
+  } catch (err) {
+    console.error(`YouTube search timed out or failed for "${keyword}": ${err.message}`);
     return [];
   }
-
-  const data = await res.json();
-  return (data.items || []).map(item => ({
-    videoId: item.id.videoId,
-    title: item.snippet.title,
-    channelTitle: item.snippet.channelTitle,
-    channelId: item.snippet.channelId,
-    publishedAt: item.snippet.publishedAt,
-    description: (item.snippet.description || '').slice(0, 300),
-    thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.default?.url || null,
-    liveBroadcastContent: item.snippet.liveBroadcastContent || 'none'
-  }));
 }
 
 // Batched lookup of duration + view count for a list of video IDs.
@@ -115,17 +124,23 @@ async function fetchVideoDetails(videoIds) {
       id: batch.join(','),
       key: API_KEY
     });
-    const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?${params.toString()}`);
-    if (!res.ok) {
-      console.error(`videos.list failed: ${res.status} ${await res.text()}`);
-      continue;
-    }
-    const data = await res.json();
-    for (const item of data.items || []) {
-      details.set(item.id, {
-        durationSeconds: parseISO8601Duration(item.contentDetails?.duration),
-        viewCount: item.statistics?.viewCount ? Number(item.statistics.viewCount) : null
+    try {
+      const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?${params.toString()}`, {
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
       });
+      if (!res.ok) {
+        console.error(`videos.list failed: ${res.status} ${await res.text()}`);
+        continue;
+      }
+      const data = await res.json();
+      for (const item of data.items || []) {
+        details.set(item.id, {
+          durationSeconds: parseISO8601Duration(item.contentDetails?.duration),
+          viewCount: item.statistics?.viewCount ? Number(item.statistics.viewCount) : null
+        });
+      }
+    } catch (err) {
+      console.error(`videos.list timed out or failed: ${err.message}`);
     }
   }
   return details;
@@ -140,18 +155,24 @@ async function fetchChannelDetails(channelIds) {
       id: batch.join(','),
       key: API_KEY
     });
-    const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?${params.toString()}`);
-    if (!res.ok) {
-      console.error(`channels.list failed: ${res.status} ${await res.text()}`);
-      continue;
-    }
-    const data = await res.json();
-    for (const item of data.items || []) {
-      details.set(item.id, {
-        subscriberCount: item.statistics?.hiddenSubscriberCount
-          ? null // channel chose to hide its count — don't penalize for unknown
-          : Number(item.statistics?.subscriberCount || 0)
+    try {
+      const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?${params.toString()}`, {
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
       });
+      if (!res.ok) {
+        console.error(`channels.list failed: ${res.status} ${await res.text()}`);
+        continue;
+      }
+      const data = await res.json();
+      for (const item of data.items || []) {
+        details.set(item.id, {
+          subscriberCount: item.statistics?.hiddenSubscriberCount
+            ? null // channel chose to hide its count — don't penalize for unknown
+            : Number(item.statistics?.subscriberCount || 0)
+        });
+      }
+    } catch (err) {
+      console.error(`channels.list timed out or failed: ${err.message}`);
     }
   }
   return details;
